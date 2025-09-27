@@ -1,0 +1,205 @@
+{
+  "agentName": "Archon",
+  "agentDescription": "Autonomous Principal Architect for CI/CD PR review",
+  "foundationModel": "anthropic.claude-3-haiku-20240307-v1:0",
+  "instruction": "You are Archon, an autonomous AI agent that performs comprehensive CI/CD PR review for infrastructure-as-code changes. Your role is to analyze pull requests for security, cost, and reliability issues while providing actionable guidance and automated remediation suggestions.\n\n## Core Principles\n- Provide single, concise PR comments with clear sections\n- Use emojis to organize findings: 💰 for cost, 🛡️ for security, ⚙️ for reliability\n- Include confidence intervals and assumptions for cost estimates\n- Reference Well-Architected Framework guidance when applicable\n- Prioritize high-impact findings and provide specific remediation steps\n\n## Analysis Workflow\n1. **Fast Pass**: Quick security scan + heuristic cost analysis (< 60s)\n2. **Deep Pass**: Full IaC plan analysis + precise pricing (triggered by label)\n3. **Auto-Fix**: Create remediation PRs for common, safe issues\n\n## Output Format\nStructure all PR comments with:\n- **Summary**: Brief overview of findings\n- **💰 Cost Impact**: Monthly delta with confidence and assumptions\n- **🛡️ Security**: Static analysis findings with severity\n- **⚙️ Reliability**: Well-Architected compliance issues\n- **Suggested Fixes**: Concrete code changes and auto-fix PRs\n\nAlways be precise, actionable, and respectful in your guidance.",
+  "actionGroups": [
+    {
+      "actionGroupName": "ArchonTools",
+      "actionGroupDescription": "Core Archon analysis tools for PR review",
+      "actions": [
+        {
+          "actionName": "fetch_pr_context",
+          "actionDescription": "Retrieve PR metadata, changed files, and labels from GitHub",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "repo": {
+                "type": "string",
+                "description": "Repository in format 'org/repo'"
+              },
+              "pr_number": {
+                "type": "integer",
+                "description": "Pull request number"
+              }
+            },
+            "required": ["repo", "pr_number"]
+          }
+        },
+        {
+          "actionName": "security_static_scan",
+          "actionDescription": "Run static security analysis on changed IaC files using Checkov/tfsec",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "repo": {
+                "type": "string",
+                "description": "Repository in format 'org/repo'"
+              },
+              "commit_sha": {
+                "type": "string",
+                "description": "Commit SHA to analyze"
+              },
+              "workdir": {
+                "type": "string",
+                "description": "Working directory containing IaC files",
+                "default": "infra/"
+              }
+            },
+            "required": ["repo", "commit_sha"]
+          }
+        },
+        {
+          "actionName": "finops_pricing_delta",
+          "actionDescription": "Calculate monthly cost delta for infrastructure changes",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "plan_json_s3": {
+                "type": "string",
+                "description": "S3 path to plan JSON (optional for fast pass)"
+              },
+              "repo": {
+                "type": "string",
+                "description": "Repository in format 'org/repo'"
+              },
+              "commit_sha": {
+                "type": "string",
+                "description": "Commit SHA to analyze"
+              },
+              "region": {
+                "type": "string",
+                "description": "AWS region for pricing",
+                "default": "eu-west-1"
+              }
+            },
+            "required": ["repo", "commit_sha"]
+          }
+        },
+        {
+          "actionName": "run_iac_plan",
+          "actionDescription": "Execute Terraform plan or CDK synth in sandbox environment",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "repo": {
+                "type": "string",
+                "description": "Repository in format 'org/repo'"
+              },
+              "commit_sha": {
+                "type": "string",
+                "description": "Commit SHA to analyze"
+              },
+              "iac_type": {
+                "type": "string",
+                "enum": ["terraform", "tofu", "cdk"],
+                "description": "Type of IaC to analyze"
+              },
+              "workdir": {
+                "type": "string",
+                "description": "Working directory containing IaC files",
+                "default": "infra/"
+              }
+            },
+            "required": ["repo", "commit_sha", "iac_type"]
+          }
+        },
+        {
+          "actionName": "kb_lookup",
+          "actionDescription": "Retrieve Well-Architected Framework guidance and evidence",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "topic": {
+                "type": "string",
+                "description": "Topic to search for (e.g., 'S3 encryption at rest requirement')"
+              },
+              "pillar": {
+                "type": "string",
+                "enum": ["Security", "Reliability", "Performance", "Cost", "Operational Excellence"],
+                "description": "Well-Architected pillar"
+              }
+            },
+            "required": ["topic"]
+          }
+        },
+        {
+          "actionName": "post_pr_comment",
+          "actionDescription": "Post unified analysis comment to GitHub PR",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "repo": {
+                "type": "string",
+                "description": "Repository in format 'org/repo'"
+              },
+              "pr_number": {
+                "type": "integer",
+                "description": "Pull request number"
+              },
+              "body_markdown": {
+                "type": "string",
+                "description": "Markdown content for the comment"
+              },
+              "update_existing": {
+                "type": "boolean",
+                "description": "Whether to update existing comment or create new one",
+                "default": true
+              }
+            },
+            "required": ["repo", "pr_number", "body_markdown"]
+          }
+        },
+        {
+          "actionName": "create_remediation_pr",
+          "actionDescription": "Create auto-fix PR with minimal diffs for common issues",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "repo": {
+                "type": "string",
+                "description": "Repository in format 'org/repo'"
+              },
+              "base_pr_number": {
+                "type": "integer",
+                "description": "Base PR number to reference"
+              },
+              "patches": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "file": {
+                      "type": "string",
+                      "description": "File path to patch"
+                    },
+                    "diff": {
+                      "type": "string",
+                      "description": "Unified diff content"
+                    }
+                  },
+                  "required": ["file", "diff"]
+                },
+                "description": "Array of file patches"
+              },
+              "title": {
+                "type": "string",
+                "description": "PR title",
+                "default": "Archon auto-remediation"
+              },
+              "body": {
+                "type": "string",
+                "description": "PR description with evidence"
+              }
+            },
+            "required": ["repo", "base_pr_number", "patches"]
+          }
+        }
+      ]
+    }
+  ],
+  "guardrailConfiguration": {
+    "guardrailIdentifier": "archon-guardrails",
+    "guardrailVersion": "DRAFT"
+  }
+}
