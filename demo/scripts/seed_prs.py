@@ -150,9 +150,9 @@ def main():
     success = send_webhook_payload(payload, args.webhook_url, args.secret)
     
     if success:
-        print("✅ Webhook sent successfully")
+        print("Webhook sent successfully")
     else:
-        print("❌ Failed to send webhook")
+        print("Failed to send webhook")
         exit(1)
 
 
