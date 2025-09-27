@@ -33,12 +33,15 @@ See [docs/architecture-diagram.md](docs/architecture-diagram.md) for detailed sy
 
 ### MVP Scope (Current Branch: `feat/mvp-fast-pass`)
 
-1. ✅ Webhook endpoint with GitHub signature verification
-2. ✅ Bedrock AgentCore with tool registry
-3. ✅ Fast pass analysis (< 60s)
-4. ✅ Basic FinOps pricing calculator
-5. ✅ Security static scanning
-6. ✅ Unified PR comments
+1. ✅ Repository structure and documentation
+2. ✅ Webhook endpoint with GitHub signature verification
+3. ✅ Bedrock AgentCore with tool registry
+4. ✅ Core tool stubs with strict I/O JSON contracts
+5. ✅ Local testing and validation framework
+6. 🔄 Fast pass analysis (< 60s) - *In Progress*
+7. 🔄 Basic FinOps pricing calculator - *In Progress*
+8. 🔄 Security static scanning - *In Progress*
+9. 🔄 Unified PR comments - *In Progress*
 
 ### Deep Pass (Next: `feat/deep-pass-fargate`)
 
@@ -54,10 +57,21 @@ See [docs/architecture-diagram.md](docs/architecture-diagram.md) for detailed sy
 
 ## Contributing
 
+### Branching Strategy
+
+We follow a strict branching strategy for incremental development:
+
+1. **`feat/mvp-fast-pass`** (Current) - Fast pass analysis with basic tools
+2. **`feat/deep-pass-fargate`** - ECS Fargate integration for full IaC analysis  
+3. **`feat/autofix-pr`** - Automated remediation PR generation
+
+### Development Guidelines
+
 1. Follow the branching strategy: `feat/mvp-fast-pass` → `feat/deep-pass-fargate` → `feat/autofix-pr`
-2. Make small, vertical commits
+2. Make small, vertical commits with clear messages
 3. Each commit must compile, run, and include tests
 4. Prefer interfaces first, then stubs, then implementation
+5. Test locally before pushing to remote branches
 
 ## License
 
