@@ -105,6 +105,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
     id     = "cleanup_old_versions"
     status = "Enabled"
 
+    filter {
+      prefix = ""
+    }
+
     noncurrent_version_expiration {
       noncurrent_days = 30
     }
@@ -142,15 +146,17 @@ resource "aws_dynamodb_table" "runs" {
   }
 
   global_secondary_index {
-    name     = "repo-pr-index"
-    hash_key = "repo"
-    range_key = "pr_number"
+    name            = "repo-pr-index"
+    hash_key        = "repo"
+    range_key       = "pr_number"
+    projection_type = "ALL"
   }
 
   global_secondary_index {
-    name     = "timestamp-index"
-    hash_key = "repo"
-    range_key = "timestamp"
+    name            = "timestamp-index"
+    hash_key        = "repo"
+    range_key       = "timestamp"
+    projection_type = "ALL"
   }
 
   point_in_time_recovery {
@@ -177,9 +183,10 @@ resource "aws_dynamodb_table" "kb_cache" {
   }
 
   global_secondary_index {
-    name     = "timestamp-index"
-    hash_key = "query_hash"
-    range_key = "timestamp"
+    name            = "timestamp-index"
+    hash_key        = "query_hash"
+    range_key       = "timestamp"
+    projection_type = "ALL"
   }
 
   ttl {

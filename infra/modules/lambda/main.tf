@@ -107,7 +107,6 @@ resource "aws_lambda_function" "webhook_handler" {
       BEDROCK_AGENT_ALIAS_ID = var.bedrock_agent_alias_id
       RUNS_TABLE_NAME       = var.runs_table_name
       ARTIFACTS_BUCKET      = var.artifacts_bucket_name
-      AWS_REGION           = data.aws_region.current.name
     }
   }
 

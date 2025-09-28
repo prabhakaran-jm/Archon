@@ -9,6 +9,15 @@ terraform {
       version = "~> 5.0"
     }
   }
+  
+  # Remote backend configuration
+  backend "s3" {
+    bucket         = "archon-terraform-state-556274720247-us-east-1"
+    key            = "dev/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "archon-terraform-locks"
+    encrypt        = true
+  }
 }
 
 provider "aws" {
@@ -49,10 +58,82 @@ variable "github_webhook_secret" {
   sensitive   = true
 }
 
+variable "bedrock_agent_id" {
+  description = "Bedrock Agent ID"
+  type        = string
+  default     = ""
+}
+
+variable "bedrock_agent_alias_id" {
+  description = "Bedrock Agent Alias ID"
+  type        = string
+  default     = "TSTALIASID"
+}
+
+variable "knowledge_base_id" {
+  description = "Bedrock Knowledge Base ID"
+  type        = string
+  default     = ""
+}
+
+variable "vpc_cidr" {
+  description = "VPC CIDR block"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "public_subnet_cidrs" {
+  description = "Public subnet CIDR blocks"
+  type        = list(string)
+  default     = ["10.0.1.0/24", "10.0.2.0/24"]
+}
+
+variable "private_subnet_cidrs" {
+  description = "Private subnet CIDR blocks"
+  type        = list(string)
+  default     = ["10.0.10.0/24", "10.0.20.0/24"]
+}
+
+variable "enable_nat_gateway" {
+  description = "Enable NAT Gateway"
+  type        = bool
+  default     = true
+}
+
+variable "ecs_cluster_name" {
+  description = "ECS cluster name"
+  type        = string
+  default     = "archon-iac-cluster"
+}
+
 variable "github_token_secret_name" {
   description = "AWS Secrets Manager secret name for GitHub token"
   type        = string
   default     = "archon/github/token"
+}
+
+variable "ecs_task_definition_name" {
+  description = "ECS task definition name"
+  type        = string
+  default     = "archon-iac-task"
+}
+
+variable "ecs_cpu" {
+  description = "ECS task CPU units (1024 = 1 vCPU)"
+  type        = number
+  default     = 512
+}
+
+variable "ecs_memory" {
+  description = "ECS task memory in MB"
+  type        = number
+  default     = 1024
+}
+
+variable "create_vpc_endpoints" {
+  description = "Create VPC endpoints"
+  type        = bool
+  default     = false
 }
 
 # Module calls
@@ -122,6 +203,10 @@ module "ecs" {
   ecs_task_role_arn         = module.iam.ecs_task_role_arn
   artifacts_bucket_name     = module.storage.artifacts_bucket_name
   github_token_secret_arn    = module.secrets.github_token_secret_arn
+  
+  # Cost-optimized ECS configuration
+  task_cpu    = var.ecs_cpu
+  task_memory = var.ecs_memory
 }
 
 module "lambda" {

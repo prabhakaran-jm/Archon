@@ -6,7 +6,7 @@ This directory contains deployment, configuration, and monitoring scripts for Ar
 
 ### Deployment Scripts
 
-#### `deploy.sh` / `deploy.ps1`
+#### `deploy.sh` 
 Automated deployment script for Archon infrastructure.
 
 **Features:**
@@ -33,15 +33,6 @@ Automated deployment script for Archon infrastructure.
 
 # Show deployment status
 ./deploy.sh status prod
-```
-
-**PowerShell (Windows):**
-```powershell
-# Deploy to development environment
-.\deploy.ps1 deploy dev
-
-# Deploy to production environment
-.\deploy.ps1 deploy prod
 ```
 
 ### Configuration Scripts
