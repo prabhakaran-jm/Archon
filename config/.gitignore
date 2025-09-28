@@ -1,0 +1,26 @@
+# Archon Configuration Directory
+# This directory contains environment-specific configuration files
+
+# Secrets files (never commit these)
+secrets.env
+*.env
+
+# Local configuration overrides
+local.env
+dev.env
+staging.env
+prod.env
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
