@@ -15,6 +15,17 @@ from urllib.parse import unquote
 import boto3
 from botocore.exceptions import ClientError
 
+# Import circuit breaker and multi-region support
+import sys
+sys.path.append('/opt/python')
+try:
+    from circuit_breaker import get_bedrock_circuit_breaker, CircuitBreakerOpenException
+    from multi_region import get_current_region, check_and_failover
+    CIRCUIT_BREAKER_AVAILABLE = True
+except ImportError:
+    CIRCUIT_BREAKER_AVAILABLE = False
+    logger.warning("Circuit breaker modules not available")
+
 # Configure logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -165,19 +176,46 @@ def invoke_bedrock_agent(repo: str, pr_number: int, commit_sha: str, analysis_ty
         # Create session for this run
         session_id = f"archon-{run_id}"
         
-        # Invoke Bedrock Agent
-        response = bedrock_agent_runtime.invoke_agent(
-            agentId=BEDROCK_AGENT_ID,
-            agentAliasId=BEDROCK_AGENT_ALIAS_ID,
-            sessionId=session_id,
-            inputText=f"Analyze PR {pr_number} in {repo} with {analysis_type} analysis. Context: {json.dumps(context)}"
-        )
-        
-        # Process response
-        result = ""
-        for event in response['completion']:
-            if 'chunk' in event:
-                result += event['chunk']['bytes'].decode('utf-8')
+        # Invoke Bedrock Agent with circuit breaker protection
+        if CIRCUIT_BREAKER_AVAILABLE:
+            bedrock_cb = get_bedrock_circuit_breaker()
+            
+            def _invoke_bedrock():
+                response = bedrock_agent_runtime.invoke_agent(
+                    agentId=BEDROCK_AGENT_ID,
+                    agentAliasId=BEDROCK_AGENT_ALIAS_ID,
+                    sessionId=session_id,
+                    inputText=f"Analyze PR {pr_number} in {repo} with {analysis_type} analysis. Context: {json.dumps(context)}"
+                )
+                
+                result = ""
+                for event in response['completion']:
+                    if 'chunk' in event:
+                        result += event['chunk']['bytes'].decode('utf-8')
+                
+                return result
+            
+            try:
+                result = bedrock_cb.call(_invoke_bedrock)
+            except CircuitBreakerOpenException as e:
+                logger.error(f"Bedrock circuit breaker is open: {e}")
+                return {
+                    'status': 'error',
+                    'error': 'Bedrock service temporarily unavailable'
+                }
+        else:
+            # Fallback without circuit breaker
+            response = bedrock_agent_runtime.invoke_agent(
+                agentId=BEDROCK_AGENT_ID,
+                agentAliasId=BEDROCK_AGENT_ALIAS_ID,
+                sessionId=session_id,
+                inputText=f"Analyze PR {pr_number} in {repo} with {analysis_type} analysis. Context: {json.dumps(context)}"
+            )
+            
+            result = ""
+            for event in response['completion']:
+                if 'chunk' in event:
+                    result += event['chunk']['bytes'].decode('utf-8')
         
         logger.info(f"Bedrock Agent invoked for {run_id}: {len(result)} characters")
         

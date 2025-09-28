@@ -12,6 +12,17 @@ import boto3
 from github import Github
 from github.GithubException import GithubException
 
+# Import circuit breaker and caching
+import sys
+sys.path.append('/opt/python')
+try:
+    from circuit_breaker import get_github_circuit_breaker, CircuitBreakerOpenException
+    from advanced_cache import get_cache, cache_result
+    CIRCUIT_BREAKER_AVAILABLE = True
+except ImportError:
+    CIRCUIT_BREAKER_AVAILABLE = False
+    logger.warning("Circuit breaker and caching modules not available")
+
 # Configure logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -110,28 +121,82 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         github_token = get_github_token()
         github = Github(github_token)
         
-        # Get repository and PR
-        repo = github.get_repo(repo_name)
-        pr = repo.get_pull(pr_number)
-        
-        # Extract PR information
-        result = {
-            'commit_sha': pr.head.sha,
-            'changed_files': get_changed_files(github, repo_name, pr_number),
-            'url': pr.html_url,
-            'labels': get_pr_labels(github, repo_name, pr_number),
-            'title': pr.title,
-            'author': pr.user.login,
-            'created_at': pr.created_at.isoformat(),
-            'updated_at': pr.updated_at.isoformat(),
-            'base_branch': pr.base.ref,
-            'head_branch': pr.head.ref,
-            'state': pr.state,
-            'mergeable': pr.mergeable,
-            'additions': pr.additions,
-            'deletions': pr.deletions,
-            'changed_files_count': pr.changed_files
-        }
+        # Use circuit breaker and caching if available
+        if CIRCUIT_BREAKER_AVAILABLE:
+            github_cb = get_github_circuit_breaker()
+            cache = get_cache()
+            
+            # Try to get from cache first
+            cache_key = f"pr_context:{repo_name}:{pr_number}"
+            cached_result = cache.get("pr_context", repo_name, pr_number)
+            
+            if cached_result:
+                logger.info(f"Using cached PR context for {repo_name}#{pr_number}")
+                return {
+                    'status': 'success',
+                    'data': cached_result
+                }
+            
+            def _fetch_pr_data():
+                # Get repository and PR
+                repo = github.get_repo(repo_name)
+                pr = repo.get_pull(pr_number)
+                
+                # Extract PR information
+                result = {
+                    'commit_sha': pr.head.sha,
+                    'changed_files': get_changed_files(github, repo_name, pr_number),
+                    'url': pr.html_url,
+                    'labels': get_pr_labels(github, repo_name, pr_number),
+                    'title': pr.title,
+                    'author': pr.user.login,
+                    'created_at': pr.created_at.isoformat(),
+                    'updated_at': pr.updated_at.isoformat(),
+                    'base_branch': pr.base.ref,
+                    'head_branch': pr.head.ref,
+                    'state': pr.state,
+                    'mergeable': pr.mergeable,
+                    'additions': pr.additions,
+                    'deletions': pr.deletions,
+                    'changed_files_count': pr.changed_files
+                }
+                
+                # Cache the result
+                cache.set("pr_context", result, 300, repo_name, pr_number)  # 5 minutes
+                
+                return result
+            
+            try:
+                result = github_cb.call(_fetch_pr_data)
+            except CircuitBreakerOpenException as e:
+                logger.error(f"GitHub circuit breaker is open: {e}")
+                return {
+                    'status': 'error',
+                    'error': 'GitHub service temporarily unavailable'
+                }
+        else:
+            # Fallback without circuit breaker
+            repo = github.get_repo(repo_name)
+            pr = repo.get_pull(pr_number)
+            
+            # Extract PR information
+            result = {
+                'commit_sha': pr.head.sha,
+                'changed_files': get_changed_files(github, repo_name, pr_number),
+                'url': pr.html_url,
+                'labels': get_pr_labels(github, repo_name, pr_number),
+                'title': pr.title,
+                'author': pr.user.login,
+                'created_at': pr.created_at.isoformat(),
+                'updated_at': pr.updated_at.isoformat(),
+                'base_branch': pr.base.ref,
+                'head_branch': pr.head.ref,
+                'state': pr.state,
+                'mergeable': pr.mergeable,
+                'additions': pr.additions,
+                'deletions': pr.deletions,
+                'changed_files_count': pr.changed_files
+            }
         
         logger.info(f"Fetched PR context for {repo_name}#{pr_number}: {len(result['changed_files'])} files changed")
         

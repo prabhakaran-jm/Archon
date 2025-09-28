@@ -91,3 +91,22 @@ variable "github_token_value" {
   sensitive   = true
   default     = ""
 }
+
+# Redis/ElastiCache variables
+variable "redis_node_type" {
+  description = "ElastiCache Redis node type"
+  type        = string
+  default     = "cache.t3.micro"
+}
+
+variable "redis_num_nodes" {
+  description = "Number of Redis cache nodes"
+  type        = number
+  default     = 2
+}
+
+variable "redis_snapshot_retention_days" {
+  description = "Number of days to retain Redis snapshots"
+  type        = number
+  default     = 7
+}

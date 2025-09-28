@@ -60,3 +60,24 @@ output "secrets_manager_arn" {
   description = "Secrets Manager secret ARN"
   value       = module.secrets.github_token_secret_arn
 }
+
+# Redis/ElastiCache outputs
+output "redis_endpoint" {
+  description = "Redis cluster endpoint"
+  value       = module.cache.redis_endpoint
+}
+
+output "redis_port" {
+  description = "Redis cluster port"
+  value       = module.cache.redis_port
+}
+
+output "redis_security_group_id" {
+  description = "Security group ID for Redis"
+  value       = module.cache.redis_security_group_id
+}
+
+output "redis_access_role_arn" {
+  description = "IAM role ARN for Redis access"
+  value       = module.cache.redis_access_role_arn
+}

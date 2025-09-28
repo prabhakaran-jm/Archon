@@ -140,6 +140,24 @@ module "lambda" {
   lambda_execution_role_arn = module.iam.lambda_execution_role_arn
 }
 
+# Cache module (Redis/ElastiCache)
+module "cache" {
+  source = "./modules/cache"
+  
+  name_prefix = "${local.project_name}-${local.environment}"
+  vpc_id      = module.networking.vpc_id
+  subnet_ids  = module.networking.private_subnet_ids
+  
+  node_type             = var.redis_node_type
+  num_cache_nodes       = var.redis_num_nodes
+  snapshot_retention_days = var.redis_snapshot_retention_days
+  log_retention_days    = var.log_retention_days
+  
+  create_vpc_endpoint = var.create_vpc_endpoints
+  
+  tags = local.common_tags
+}
+
 # Outputs
 output "api_gateway_url" {
   description = "API Gateway endpoint URL"
