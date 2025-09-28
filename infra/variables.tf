@@ -84,3 +84,10 @@ variable "enable_vpc_endpoints" {
   type        = bool
   default     = true
 }
+
+variable "github_token_value" {
+  description = "GitHub token value (optional - can be set later)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

@@ -1,0 +1,29 @@
+# Archon Infrastructure Configuration
+# Copy this file to terraform.tfvars and customize the values
+
+# AWS Configuration
+aws_region = "us-east-1"
+environment = "dev"
+
+# GitHub Configuration
+github_webhook_secret = "your-github-webhook-secret-here"
+github_token_value = "your-github-token-here"
+
+# Bedrock Configuration
+bedrock_agent_id = "your-bedrock-agent-id"
+bedrock_agent_alias_id = "TSTALIASID"
+knowledge_base_id = "your-knowledge-base-id"
+
+# Networking Configuration
+vpc_cidr = "10.0.0.0/16"
+public_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.20.0/24"]
+enable_nat_gateway = true
+enable_vpc_endpoints = true
+
+# ECS Configuration
+ecs_cluster_name = "archon-iac-cluster"
+ecs_task_definition_name = "archon-iac-task"
+
+# Secrets Configuration
+github_token_secret_name = "archon/github/token"
