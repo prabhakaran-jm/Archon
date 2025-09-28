@@ -45,10 +45,13 @@ See [docs/architecture-diagram.md](docs/architecture-diagram.md) for detailed sy
 
 **🎉 MVP Fast Pass Complete! Ready for Deep Pass implementation.**
 
-### Deep Pass (Next: `feat/deep-pass-fargate`)
+### Deep Pass (Current: `feat/deep-pass-fargate`) ✅ IN PROGRESS
 
-- ECS Fargate for Terraform/CDK plan execution
-- Knowledge Base integration
+- ✅ ECS Fargate integration for Terraform/CDK plan execution
+- ✅ Enhanced cost analysis with real plan JSON parsing
+- ✅ Knowledge Base integration with Well-Architected Framework
+- ✅ Deep-scan label trigger for full analysis
+- ✅ Phase 2 unit tests and validation framework
 - Enhanced pricing with plan analysis
 
 ### Auto-Fix (Future: `feat/autofix-pr`)
@@ -80,7 +83,7 @@ We follow a strict branching strategy for incremental development:
 
 - **Unit Tests**: `tests/` directory with pytest framework
 - **Phase 1 (MVP Fast Pass)**: ✅ 7/7 unit tests passing
-- **Phase 2 (Deep Pass)**: Will include ECS Fargate integration tests
+- **Phase 2 (Deep Pass)**: ✅ 8/8 unit tests passing (ECS, pricing, WAF)
 - **Phase 3 (Auto-Fix)**: Will include remediation PR generation tests
 - **Integration Tests**: End-to-end webhook → tool → comment flow
 

@@ -1,0 +1,246 @@
+{
+  "agentName": "Archon Deep Pass",
+  "agentDescription": "Autonomous Principal Architect for CI/CD PR review with Deep Pass analysis",
+  "foundationModel": "anthropic.claude-3-sonnet-20240229-v1:0",
+  "instruction": "You are Archon, an autonomous AI agent that performs comprehensive CI/CD PR review for infrastructure-as-code changes. Your role is to analyze pull requests for security, cost, and reliability issues while providing actionable guidance and automated remediation suggestions.\n\n## Core Principles\n- Provide single, concise PR comments with clear sections\n- Use emojis to organize findings: 💰 for cost, 🛡️ for security, ⚙️ for reliability\n- Include confidence intervals and assumptions for cost estimates\n- Reference Well-Architected Framework guidance when applicable\n- Prioritize high-impact findings and provide specific remediation steps\n\n## Analysis Workflow\n1. **Fast Pass**: Quick security scan + heuristic cost analysis (< 60s)\n2. **Deep Pass**: Full IaC plan analysis + precise pricing + WAF guidance (triggered by deep-scan label)\n3. **Auto-Fix**: Create remediation PRs for common, safe issues\n\n## Deep Pass Analysis\nWhen triggered by 'deep-scan' label or large changes:\n- Execute actual Terraform plan or CDK synth in ECS Fargate\n- Parse real infrastructure plans for precise cost analysis\n- Retrieve Well-Architected Framework guidance from Knowledge Base\n- Provide evidence-based recommendations with implementation examples\n\n## Output Format\nStructure all PR comments with:\n- **Summary**: Brief overview of findings\n- **💰 Cost Impact**: Monthly delta with confidence and assumptions\n- **🛡️ Security**: Static analysis findings with severity\n- **⚙️ Reliability**: Well-Architected compliance issues\n- **📚 WAF Guidance**: Evidence-based recommendations (Deep Pass only)\n- **Suggested Fixes**: Concrete code changes and auto-fix PRs\n\nAlways be precise, actionable, and respectful in your guidance.",
+  "actionGroups": [
+    {
+      "actionGroupName": "ArchonTools",
+      "actionGroupDescription": "Core Archon analysis tools for PR review",
+      "actions": [
+        {
+          "actionName": "fetch_pr_context",
+          "actionDescription": "Retrieve PR metadata, changed files, and labels from GitHub",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "repo": {
+                "type": "string",
+                "description": "Repository in format 'org/repo'"
+              },
+              "pr_number": {
+                "type": "integer",
+                "description": "Pull request number"
+              }
+            },
+            "required": ["repo", "pr_number"]
+          }
+        },
+        {
+          "actionName": "security_static_scan",
+          "actionDescription": "Run static security analysis on changed IaC files using Checkov/tfsec",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "repo": {
+                "type": "string",
+                "description": "Repository in format 'org/repo'"
+              },
+              "commit_sha": {
+                "type": "string",
+                "description": "Commit SHA to analyze"
+              },
+              "workdir": {
+                "type": "string",
+                "description": "Working directory containing IaC files",
+                "default": "infra/"
+              }
+            },
+            "required": ["repo", "commit_sha"]
+          }
+        },
+        {
+          "actionName": "finops_pricing_delta",
+          "actionDescription": "Calculate monthly cost delta for infrastructure changes with confidence intervals",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "raw_plan_json_s3": {
+                "type": "string",
+                "description": "S3 path to Terraform plan JSON (Deep Pass only)"
+              },
+              "cdk_output_s3": {
+                "type": "string",
+                "description": "S3 path to CDK synth output (Deep Pass only)"
+              },
+              "region": {
+                "type": "string",
+                "description": "AWS region for pricing calculations",
+                "default": "eu-west-1"
+              },
+              "plan_type": {
+                "type": "string",
+                "description": "Type of plan: terraform, cdk, or heuristic",
+                "default": "heuristic"
+              }
+            },
+            "required": []
+          }
+        },
+        {
+          "actionName": "post_pr_comment",
+          "actionDescription": "Post analysis results as a single Markdown comment to the PR",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "repo": {
+                "type": "string",
+                "description": "Repository in format 'org/repo'"
+              },
+              "pr_number": {
+                "type": "integer",
+                "description": "Pull request number"
+              },
+              "comment": {
+                "type": "string",
+                "description": "Markdown comment content with 💰🛡️⚙️ sections"
+              }
+            },
+            "required": ["repo", "pr_number", "comment"]
+          }
+        },
+        {
+          "actionName": "run_iac_plan",
+          "actionDescription": "Execute Terraform plan or CDK synth in ECS Fargate sandbox (Deep Pass only)",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "repo": {
+                "type": "string",
+                "description": "Repository in format 'org/repo'"
+              },
+              "commit_sha": {
+                "type": "string",
+                "description": "Commit SHA to analyze"
+              },
+              "iac_type": {
+                "type": "string",
+                "description": "IaC type: terraform, tofu, or cdk",
+                "enum": ["terraform", "tofu", "cdk"]
+              },
+              "workdir": {
+                "type": "string",
+                "description": "Working directory containing IaC files",
+                "default": "infra/"
+              },
+              "pr_number": {
+                "type": "integer",
+                "description": "Pull request number for artifact organization"
+              }
+            },
+            "required": ["repo", "commit_sha", "iac_type"]
+          }
+        },
+        {
+          "actionName": "kb_lookup",
+          "actionDescription": "Retrieve Well-Architected Framework guidance and evidence from Knowledge Base (Deep Pass only)",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "topic": {
+                "type": "string",
+                "description": "Topic to search for guidance (e.g., s3_encryption, ebs_optimization)"
+              },
+              "pillar": {
+                "type": "string",
+                "description": "WAF pillar: security, reliability, performance_efficiency, cost_optimization, operational_excellence, sustainability",
+                "enum": ["security", "reliability", "performance_efficiency", "cost_optimization", "operational_excellence", "sustainability"]
+              },
+              "resource_type": {
+                "type": "string",
+                "description": "AWS resource type (e.g., aws_s3_bucket, aws_ebs_volume)"
+              },
+              "resource_config": {
+                "type": "object",
+                "description": "Resource configuration to analyze for compliance"
+              },
+              "plan_data": {
+                "type": "object",
+                "description": "Full plan data for comprehensive analysis"
+              }
+            },
+            "required": ["topic"]
+          }
+        },
+        {
+          "actionName": "create_remediation_pr",
+          "actionDescription": "Create automated remediation PR for common, safe issues (Auto-Fix phase)",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "repo": {
+                "type": "string",
+                "description": "Repository in format 'org/repo'"
+              },
+              "base_branch": {
+                "type": "string",
+                "description": "Base branch for the remediation PR",
+                "default": "main"
+              },
+              "fixes": {
+                "type": "array",
+                "description": "Array of fixes to apply",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "file_path": {
+                      "type": "string",
+                      "description": "Path to the file to modify"
+                    },
+                    "changes": {
+                      "type": "array",
+                      "description": "Array of changes to apply",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "line_number": {
+                            "type": "integer",
+                            "description": "Line number to modify"
+                          },
+                          "old_content": {
+                            "type": "string",
+                            "description": "Content to replace"
+                          },
+                          "new_content": {
+                            "type": "string",
+                            "description": "New content"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "pr_title": {
+                "type": "string",
+                "description": "Title for the remediation PR"
+              },
+              "pr_body": {
+                "type": "string",
+                "description": "Description for the remediation PR"
+              }
+            },
+            "required": ["repo", "fixes", "pr_title", "pr_body"]
+          }
+        }
+      ]
+    }
+  ],
+  "knowledgeBase": {
+    "knowledgeBaseId": "archon-waf-kb",
+    "description": "Well-Architected Framework guidance and AWS best practices"
+  },
+  "sessionAttributes": {
+    "analysis_type": "FAST",
+    "phase": "deep_pass",
+    "tools_enabled": {
+      "fetch_pr_context": true,
+      "security_static_scan": true,
+      "finops_pricing_delta": true,
+      "post_pr_comment": true,
+      "run_iac_plan": false,
+      "kb_lookup": false,
+      "create_remediation_pr": false
+    }
+  }
+}
