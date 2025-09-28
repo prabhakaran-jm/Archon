@@ -1,0 +1,155 @@
+name: Bedrock Resources Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+        - create-agent
+        - create-knowledge-base
+        - update-agent
+        - list-resources
+      agent_name:
+        description: 'Agent name (for create/update)'
+        required: false
+        default: 'Archon'
+      knowledge_base_name:
+        description: 'Knowledge base name (for create)'
+        required: false
+        default: 'Archon-KB'
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  manage-bedrock:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Install AWS CLI and jq
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq
+        
+    - name: List existing Bedrock resources
+      if: github.event.inputs.action == 'list-resources'
+      run: |
+        echo "=== Existing Agents ==="
+        aws bedrock-agent list-agents --region ${{ env.AWS_REGION }} || echo "No agents found"
+        
+        echo "=== Existing Knowledge Bases ==="
+        aws bedrock-agent list-knowledge-bases --region ${{ env.AWS_REGION }} || echo "No knowledge bases found"
+        
+    - name: Create Bedrock Agent
+      if: github.event.inputs.action == 'create-agent'
+      run: |
+        echo "Creating Bedrock Agent: ${{ github.event.inputs.agent_name }}"
+        
+        # Create agent
+        AGENT_ID=$(aws bedrock-agent create-agent \
+          --agent-name "${{ github.event.inputs.agent_name }}" \
+          --description "Autonomous Principal Architect for CI/CD PR review" \
+          --foundation-model "anthropic.claude-3-sonnet-20240229-v1:0" \
+          --instruction "You are Archon, an autonomous AI agent that performs comprehensive CI/CD PR review for infrastructure-as-code changes." \
+          --region ${{ env.AWS_REGION }} \
+          --query 'agent.agentId' \
+          --output text)
+          
+        echo "Agent created with ID: $AGENT_ID"
+        echo "AGENT_ID=$AGENT_ID" >> $GITHUB_ENV
+        
+        # Create agent alias
+        aws bedrock-agent create-agent-alias \
+          --agent-id "$AGENT_ID" \
+          --agent-alias-name "TSTALIASID" \
+          --description "Test alias for Archon agent" \
+          --region ${{ env.AWS_REGION }}
+          
+        echo "Agent alias created"
+        
+    - name: Create Knowledge Base
+      if: github.event.inputs.action == 'create-knowledge-base'
+      run: |
+        echo "Creating Knowledge Base: ${{ github.event.inputs.knowledge_base_name }}"
+        
+        # Create S3 bucket for knowledge base
+        KB_BUCKET="archon-kb-$(date +%s)"
+        aws s3 mb "s3://$KB_BUCKET" --region ${{ env.AWS_REGION }}
+        
+        # Create knowledge base
+        KB_ID=$(aws bedrock-agent create-knowledge-base \
+          --name "${{ github.event.inputs.knowledge_base_name }}" \
+          --description "Knowledge base for Archon with AWS Well-Architected Framework guidance" \
+          --role-arn "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/archon-kb-role" \
+          --knowledge-base-configuration '{
+            "vectorKnowledgeBaseConfiguration": {
+              "embeddingModelArn": "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1"
+            }
+          }' \
+          --storage-configuration '{
+            "type": "S3",
+            "s3Configuration": {
+              "bucketArn": "arn:aws:s3:::'$KB_BUCKET'"
+            }
+          }' \
+          --region ${{ env.AWS_REGION }} \
+          --query 'knowledgeBase.knowledgeBaseId' \
+          --output text)
+          
+        echo "Knowledge base created with ID: $KB_ID"
+        echo "KB_ID=$KB_ID" >> $GITHUB_ENV
+        echo "KB_BUCKET=$KB_BUCKET" >> $GITHUB_ENV
+        
+    - name: Update Agent Configuration
+      if: github.event.inputs.action == 'update-agent'
+      run: |
+        echo "Updating agent configuration..."
+        
+        # Get existing agent ID (you might want to store this in secrets)
+        AGENT_ID=$(aws bedrock-agent list-agents \
+          --region ${{ env.AWS_REGION }} \
+          --query 'agentSummaries[?agentName==`${{ github.event.inputs.agent_name }}`].agentId' \
+          --output text)
+          
+        if [ -z "$AGENT_ID" ]; then
+          echo "Agent not found. Please create it first."
+          exit 1
+        fi
+        
+        # Update agent with latest configuration
+        aws bedrock-agent update-agent \
+          --agent-id "$AGENT_ID" \
+          --agent-name "${{ github.event.inputs.agent_name }}" \
+          --description "Autonomous Principal Architect for CI/CD PR review with deep analysis and auto-remediation capabilities" \
+          --foundation-model "anthropic.claude-3-sonnet-20240229-v1:0" \
+          --instruction "$(cat agent/agentcore_v2.json | jq -r '.instruction')" \
+          --region ${{ env.AWS_REGION }}
+          
+        echo "Agent updated successfully"
+        
+    - name: Output resource IDs
+      if: always()
+      run: |
+        echo "=== Resource Information ==="
+        if [ ! -z "$AGENT_ID" ]; then
+          echo "Agent ID: $AGENT_ID"
+        fi
+        if [ ! -z "$KB_ID" ]; then
+          echo "Knowledge Base ID: $KB_ID"
+        fi
+        if [ ! -z "$KB_BUCKET" ]; then
+          echo "Knowledge Base Bucket: $KB_BUCKET"
+        fi

@@ -1,0 +1,120 @@
+name: Deployment Scripts
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+        - dev
+        - staging
+        - prod
+      action:
+        description: 'Deployment action'
+        required: true
+        type: choice
+        options:
+        - deploy
+        - destroy
+        - plan
+        - status
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.6.0
+        
+    - name: Create terraform.tfvars
+      run: |
+        cd infra/
+        cat > terraform.tfvars << EOF
+        aws_region = "${{ env.AWS_REGION }}"
+        environment = "${{ github.event.inputs.environment }}"
+        github_webhook_secret = "${{ secrets.GITHUB_WEBHOOK_SECRET }}"
+        github_token_value = "${{ secrets.GITHUB_TOKEN }}"
+        bedrock_agent_id = "${{ secrets.BEDROCK_AGENT_ID }}"
+        bedrock_agent_alias_id = "${{ secrets.BEDROCK_AGENT_ALIAS_ID }}"
+        knowledge_base_id = "${{ secrets.KNOWLEDGE_BASE_ID }}"
+        EOF
+        
+    - name: Terraform Init
+      run: |
+        cd infra/
+        terraform init
+        
+    - name: Terraform Plan
+      if: github.event.inputs.action == 'plan'
+      run: |
+        cd infra/
+        terraform plan -var-file=terraform.tfvars
+        
+    - name: Terraform Apply
+      if: github.event.inputs.action == 'deploy'
+      run: |
+        cd infra/
+        terraform apply -var-file=terraform.tfvars -auto-approve
+        
+    - name: Terraform Destroy
+      if: github.event.inputs.action == 'destroy'
+      run: |
+        cd infra/
+        terraform destroy -var-file=terraform.tfvars -auto-approve
+        
+    - name: Check Deployment Status
+      if: github.event.inputs.action == 'status'
+      run: |
+        cd infra/
+        terraform output
+        
+        # Check Lambda function
+        echo "=== Lambda Function Status ==="
+        aws lambda get-function --function-name $(terraform output -raw webhook_function_name) --region ${{ env.AWS_REGION }}
+        
+        # Check ECS cluster
+        echo "=== ECS Cluster Status ==="
+        aws ecs describe-clusters --clusters $(terraform output -raw ecs_cluster_name) --region ${{ env.AWS_REGION }}
+        
+        # Check DynamoDB tables
+        echo "=== DynamoDB Tables ==="
+        aws dynamodb describe-table --table-name $(terraform output -raw runs_table_name) --region ${{ env.AWS_REGION }}
+        
+    - name: Update GitHub Secrets
+      if: github.event.inputs.action == 'deploy'
+      run: |
+        cd infra/
+        
+        # Get outputs
+        API_URL=$(terraform output -raw api_gateway_url)
+        ARTIFACTS_BUCKET=$(terraform output -raw artifacts_bucket_name)
+        RUNS_TABLE=$(terraform output -raw runs_table_name)
+        
+        echo "=== Deployment Outputs ==="
+        echo "API Gateway URL: $API_URL"
+        echo "Artifacts Bucket: $ARTIFACTS_BUCKET"
+        echo "Runs Table: $RUNS_TABLE"
+        
+        # Note: GitHub secrets can only be updated via GitHub API or manually
+        echo "Please update the following GitHub secrets manually:"
+        echo "- API_GATEWAY_URL: $API_URL"
+        echo "- ARTIFACTS_BUCKET: $ARTIFACTS_BUCKET"
+        echo "- RUNS_TABLE: $RUNS_TABLE"
