@@ -18,7 +18,7 @@ Comprehensive testing strategy for Archon across all development phases, ensurin
 - Tool I/O JSON contracts validated
 - Error handling scenarios covered
 
-## Phase 2: Deep Pass (feat/deep-pass-fargate)
+## Phase 2: Deep Pass
 
 ### Planned Unit Tests
 - **run_iac_plan**: ECS task orchestration, plan parsing
@@ -38,7 +38,7 @@ Comprehensive testing strategy for Archon across all development phases, ensurin
 - Knowledge base content fixtures
 - Performance benchmarks for plan execution
 
-## Phase 3: Auto-Fix (feat/autofix-pr)
+## Phase 3: Auto-Fix
 
 ### Planned Unit Tests
 - **create_remediation_pr**: PR creation, diff generation
