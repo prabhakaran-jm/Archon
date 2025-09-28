@@ -74,6 +74,15 @@ We follow a strict branching strategy for incremental development:
 3. Each commit must compile, run, and include tests
 4. Prefer interfaces first, then stubs, then implementation
 5. Test locally before pushing to remote branches
+6. **Unit tests required for every phase** - All tools must have comprehensive test coverage
+
+### Testing Strategy
+
+- **Unit Tests**: `tests/` directory with pytest framework
+- **Phase 1 (MVP Fast Pass)**: ✅ 7/7 unit tests passing
+- **Phase 2 (Deep Pass)**: Will include ECS Fargate integration tests
+- **Phase 3 (Auto-Fix)**: Will include remediation PR generation tests
+- **Integration Tests**: End-to-end webhook → tool → comment flow
 
 ## License
 

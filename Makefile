@@ -21,7 +21,15 @@ dev: ## Start local development environment
 
 test: ## Run all tests
 	@echo "Running tests..."
-	python -m pytest tests/ -v --cov=tools --cov=agent
+	python -m pytest tests/ -v --cov=tools --cov=lambda
+
+test-unit: ## Run unit tests only
+	@echo "Running unit tests..."
+	python -m pytest tests/ -v
+
+test-coverage: ## Run tests with coverage report
+	@echo "Running tests with coverage..."
+	python -m pytest tests/ -v --cov=tools --cov=lambda --cov-report=html --cov-report=term
 
 lint: ## Run linters
 	@echo "Running linters..."
